@@ -1,0 +1,163 @@
+✅ High-Level Flow (What Will Happen)
+User shares screen ONCE
+        ↓
+MediaStream stored in main window
+        ↓
+PiP window calls `window.opener.captureScreenshot()`
+        ↓
+Canvas captures current frame
+        ↓
+Base64 image stored in memory (or IndexedDB)
+
+🧩 PART 1: Main Window (Parent App)
+📁 screenCapture.js (or wherever your logic lives)
+let screenStream = null;
+let videoEl = null;
+let canvasEl = null;
+
+export async function startScreenShare() {
+  if (screenStream) return screenStream;
+
+  screenStream = await navigator.mediaDevices.getDisplayMedia({
+    video: { frameRate: 30 },
+    audio: false
+  });
+
+  videoEl = document.createElement("video");
+  videoEl.srcObject = screenStream;
+  videoEl.muted = true;
+  videoEl.play();
+
+  canvasEl = document.createElement("canvas");
+
+  return screenStream;
+}
+
+export function captureScreenshot() {
+  if (!videoEl || !canvasEl) return null;
+
+  canvasEl.width = videoEl.videoWidth;
+  canvasEl.height = videoEl.videoHeight;
+
+  const ctx = canvasEl.getContext("2d");
+  ctx.drawImage(videoEl, 0, 0);
+
+  return canvasEl.toDataURL("image/png");
+}
+
+🔗 Expose capture function globally (IMPORTANT)
+
+In your main app entry file:
+
+import { startScreenShare, captureScreenshot } from "./screenCapture";
+
+window.startScreenShare = startScreenShare;
+window.captureScreenshot = captureScreenshot;
+
+🧩 PART 2: PiP Window (window.open())
+📁 pip.html (or injected HTML)
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Interview Controls</title>
+    <style>
+      body {
+        margin: 0;
+        background: #111;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+        font-family: sans-serif;
+      }
+      button {
+        background: #1a73e8;
+        color: white;
+        border: none;
+        padding: 14px 20px;
+        font-size: 16px;
+        cursor: pointer;
+        border-radius: 6px;
+      }
+    </style>
+  </head>
+  <body>
+    <button onclick="takeScreenshot()">📸 Capture</button>
+
+    <script>
+      function takeScreenshot() {
+        const img = window.opener.captureScreenshot();
+
+        if (!img) {
+          alert("Screen not available");
+          return;
+        }
+
+        // Send back to parent app
+        window.opener.postMessage(
+          { type: "SCREENSHOT_TAKEN", payload: img },
+          "*"
+        );
+      }
+    </script>
+  </body>
+</html>
+
+🧩 PART 3: Store & Display Screenshots (Frontend Only)
+📁 Main app listener
+const screenshots = [];
+
+window.addEventListener("message", (event) => {
+  if (event.data?.type === "SCREENSHOT_TAKEN") {
+    screenshots.push(event.data.payload);
+
+    // Render / store / preview
+    console.log("Screenshot captured:", screenshots.length);
+  }
+});
+
+
+👉 You can:
+
+Store in React state
+
+Store in IndexedDB
+
+Export later as ZIP / PDF
+
+🔐 Permissions Behavior (Important Answer to Your Question)
+
+Does the interviewer need to select screen every time?
+
+❌ NO
+
+Once getDisplayMedia() is granted:
+
+You can capture unlimited screenshots
+
+Until user stops sharing
+
+No popup again
+
+🏆 Why This Is the Cleanest Solution
+Requirement	Result
+Uses existing PiP	✅
+No re-prompt	✅
+No backend	✅
+Cross-window safe	✅
+Minimal changes	✅
+Production-grade	✅
+🚀 Optional (Recommended Enhancements)
+
+🔑 Keyboard shortcut inside PiP
+
+🧠 Auto timestamp overlay
+
+📂 IndexedDB persistence
+
+🗂 Session-based grouping
+
+If you want, tell me:
+
+Framework? (React / Vanilla / Vue)
+and I’ll tailor this exactly to your codebase without breaking anything.
